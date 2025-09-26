@@ -4,7 +4,7 @@ import { createEditor, KeyCode, KeyMod } from '@/plugin/MonacoEditor'
 import { injectUseNoteSingle } from '@/store/UseNoteSingle'
 import defaultDiagramTemplate from '@/assets/templates/defaultDiagram.md?raw'
 
-const { current, getText, readCache, update, setCurrentHtml, renderHtml } = injectUseNoteSingle()
+const { current, getText, setTextLocal, readCache, update, setCurrentHtml, renderHtml } = injectUseNoteSingle()
 const CLASS_NAME = 'note-editor'
 
 onMounted(async () => {
@@ -17,9 +17,9 @@ onMounted(async () => {
     return
   }
 
-  const editor = createEditor(editorElm, {
-    value: getText() || defaultDiagramTemplate
-  })
+  const initial = getText() || defaultDiagramTemplate
+  const editor = createEditor(editorElm, { value: initial })
+  setTextLocal(initial)
   editor.focus()
   editor.onDidChangeModelContent(async (event) => {
     !event.isFlush && (await update(editor.getValue()))
@@ -41,9 +41,7 @@ onMounted(async () => {
           editor.setValue(desired)
         }
       } else {
-        if (editor.getValue() !== '') {
-          editor.setValue('')
-        }
+        // keep current editor content for URL/default editing; avoid clearing
       }
     }
   )

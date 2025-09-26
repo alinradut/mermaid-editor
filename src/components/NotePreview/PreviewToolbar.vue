@@ -2,7 +2,7 @@
 import Zoom from '@/components/NotePreview/Toolbar/Zoom/Zoom.vue'
 import { injectUseNoteSingle } from '@/store/UseNoteSingle'
 
-const { getPermalink } = injectUseNoteSingle()
+const { getPermalink, getText, update } = injectUseNoteSingle()
 
 const copyPermalink = async () => {
   const link = getPermalink()
@@ -18,11 +18,16 @@ const copyPermalink = async () => {
     document.body.removeChild(input)
   }
 }
+
+const save = async () => {
+  await update(getText())
+}
 </script>
 
 <template>
   <div class="preview-toolbar">
     <zoom />
+    <button class="btn btn-sm btn-primary" @click="save">Save</button>
     <button class="btn btn-sm btn-outline-secondary" @click="copyPermalink">Copy permalink</button>
   </div>
 </template>

@@ -63,6 +63,10 @@ const useNoteSingle = () => {
     return state.note.text
   }
 
+  const setTextLocal = (text: Note['text']) => {
+    state.note.text = text
+  }
+
   const getPermalink = () => {
     const text = state.note.text || ''
     const utf8 = new TextEncoder().encode(text)
@@ -123,6 +127,7 @@ const useNoteSingle = () => {
     read,
     readCache,
     getText,
+    setTextLocal,
     getPermalink,
     update,
     destroy,
