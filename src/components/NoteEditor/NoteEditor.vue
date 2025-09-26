@@ -20,6 +20,7 @@ onMounted(async () => {
   const editor = createEditor(editorElm, {
     value: getText() || defaultDiagramTemplate
   })
+  editor.focus()
   editor.onDidChangeModelContent(async (event) => {
     !event.isFlush && (await update(editor.getValue()))
   })
@@ -34,19 +35,21 @@ onMounted(async () => {
     () => current.value.id,
     (id) => {
       if (id) {
-        editor.setValue(getText())
+        const desired = getText()
+        const currentVal = editor.getValue()
+        if (currentVal !== desired) {
+          editor.setValue(desired)
+        }
       } else {
-        editor.setValue('')
+        if (editor.getValue() !== '') {
+          editor.setValue('')
+        }
       }
     }
   )
 
-  // 初回描画
-  if (current.value.id) {
-    await setCurrentHtml()
-  } else {
-    await setCurrentHtml(defaultDiagramTemplate)
-  }
+  // First draw: URL text and existing text take precedence
+  await setCurrentHtml(getText() || defaultDiagramTemplate)
 })
 </script>
 

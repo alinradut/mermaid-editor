@@ -1,10 +1,29 @@
 <script setup lang="ts">
 import Zoom from '@/components/NotePreview/Toolbar/Zoom/Zoom.vue'
+import { injectUseNoteSingle } from '@/store/UseNoteSingle'
+
+const { getPermalink } = injectUseNoteSingle()
+
+const copyPermalink = async () => {
+  const link = getPermalink()
+  try {
+    await navigator.clipboard.writeText(link)
+  } catch (e) {
+    // fallback
+    const input = document.createElement('input')
+    input.value = link
+    document.body.appendChild(input)
+    input.select()
+    document.execCommand('copy')
+    document.body.removeChild(input)
+  }
+}
 </script>
 
 <template>
   <div class="preview-toolbar">
     <zoom />
+    <button class="btn btn-sm btn-outline-secondary" @click="copyPermalink">Copy permalink</button>
   </div>
 </template>
 

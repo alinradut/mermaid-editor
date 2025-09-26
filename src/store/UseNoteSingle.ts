@@ -1,6 +1,7 @@
 import { computed, inject, type InjectionKey, provide, reactive, ref, toRaw } from 'vue'
 import { noteCacheRepository } from '@/repository/NoteCacheRepository'
 import { noteSingleRepository } from '@/repository/NoteSingleRepository'
+import { noteCollectionRepository } from '@/repository/NoteCollectionRepository'
 import { getDefaultNote, type Note } from '@/entities/Note'
 import { convertToHtml } from '@/plugin/Marked'
 import { parser } from '@/lib/NoteParser'
@@ -10,6 +11,19 @@ type State = {
 }
 
 const useNoteSingle = () => {
+  const QUERY_KEY_TEXT = 'text'
+
+  const pushTextToUrl = (text: string) => {
+    const utf8 = new TextEncoder().encode(text)
+    let binary = ''
+    utf8.forEach((b) => (binary += String.fromCharCode(b)))
+    const b64 = btoa(binary)
+    const url = new URL(window.location.href)
+    url.searchParams.set(QUERY_KEY_TEXT, b64)
+    url.searchParams.delete('id')
+    window.history.pushState({}, '', url)
+  }
+
   const state = reactive<State>({
     note: getDefaultNote()
   })
@@ -22,6 +36,25 @@ const useNoteSingle = () => {
   }
 
   const readCache = async () => {
+    // 1) Prefer URL-embedded text if present
+    const url = new URL(window.location.href)
+    const textParam = url.searchParams.get(QUERY_KEY_TEXT)
+    if (textParam) {
+      try {
+        // Base64 decode UTF-8
+        const bin = atob(textParam)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        const decoded = new TextDecoder().decode(bytes)
+        state.note.text = decoded
+        htmlString.value = convertToHtml(decoded)
+        return
+      } catch (e) {
+        // fall through to cache load
+      }
+    }
+
+    // 2) Otherwise load last opened note by id (legacy)
     const id = noteCacheRepository.fetch()
     id && (await read(id))
   }
@@ -30,11 +63,27 @@ const useNoteSingle = () => {
     return state.note.text
   }
 
+  const getPermalink = () => {
+    const text = state.note.text || ''
+    const utf8 = new TextEncoder().encode(text)
+    let binary = ''
+    utf8.forEach((b) => (binary += String.fromCharCode(b)))
+    const b64 = btoa(binary)
+    const url = new URL(window.location.href)
+    url.searchParams.set('text', b64)
+    return url.toString()
+  }
+
   const update = async (text: Note['text']) => {
+    const { diagrams } = parser(text)
     if (!state.note.id) {
+      // First modification of a non-persisted (URL/default) note: create it
+      const id = await noteCollectionRepository.add({ ...getDefaultNote(), text, diagrams })
+      await read(id)
       return
     }
     state.note.text = text
+    state.note.diagrams = diagrams
     const result = await noteSingleRepository.update(toRaw(state.note))
     // updatedAt が更新される
     Object.assign(state.note, result)
@@ -54,13 +103,17 @@ const useNoteSingle = () => {
   }
 
   const renderHtml = async (text: Note['text']) => {
-    if (!state.note.id) {
-      return
-    }
+    // Allow rendering even when note isn't persisted (URL-only)
     const { diagrams } = parser(text)
     state.note.diagrams = diagrams
-    // diagrams を更新するため
-    await update(text)
+    if (state.note.id) {
+      // Persisted note: also update storage
+      await update(text)
+    } else {
+      state.note.text = text
+    }
+    // Update URL to reflect the rendered content
+    pushTextToUrl(text)
     htmlString.value = convertToHtml(text)
   }
 
@@ -70,6 +123,7 @@ const useNoteSingle = () => {
     read,
     readCache,
     getText,
+    getPermalink,
     update,
     destroy,
     setCurrentHtml,
